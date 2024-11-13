@@ -3,10 +3,10 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.EventSystems;
 
-public class GameManager : MonoBehaviour
+public class Game : MonoBehaviour
 {
-    private static GameManager _instance;
-    public static GameManager instance {get{return _instance;}}
+    private static Game _instance;
+    public static Game instance {get{return _instance;}}
 
     //gameState
     Player player; 

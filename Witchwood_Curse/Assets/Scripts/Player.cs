@@ -6,10 +6,11 @@ using UnityEngine.EventSystems;
 public class Player : MonoBehaviour
 {
     public Camera playerCamera;
-    GameManager gm = GameManager.instance;
+    Game gm = Game.instance;
+    Rigidbody rb;
 
     int health = 10;
-    float speed = 10f;
+    float maxVelocity = 2f;
     float damage = 10f;
     float range = 10f;
     float spread = 1f;
@@ -17,17 +18,54 @@ public class Player : MonoBehaviour
 
     bool isAlive = true;
     bool isDebugSet = true;
+
+    Vector3 moveDirection = Vector3.zero;
+    bool dashToggle = false;
+    int dashFrameCount = 0;
     
     void Start()
     {
         playerCamera = Camera.main;
+        rb = gameObject.GetComponent<Rigidbody>();
     }
     
-    void Update()
+    void Update(){
+        Inputs();
+    }
+
+    void FixedUpdate()
     {
         //Update Stats
         isAlive = health > 0;
 
+        //Debug line
+        if(isDebugSet) {
+            Debug.DrawRay(transform.position + new Vector3(0,0.5f,0), moveDirection * 5, Color.green); 
+        }
+
+        //Set position
+        if(dashToggle){
+            //Iframes too
+            rb.AddForce(moveDirection * dashFrameCount * 2,ForceMode.Impulse);
+            dashFrameCount--;
+            if(dashFrameCount <= 0) {
+                dashToggle = false;
+            }
+        }
+        else{
+            rb.AddForce(moveDirection * maxVelocity * 10, ForceMode.VelocityChange);
+            //rb.velocity = moveDirection * maxVelocity;
+
+            if(rb.velocity.magnitude > maxVelocity){
+                rb.velocity = moveDirection * maxVelocity;
+            }
+            Debug.Log(rb.velocity.magnitude);
+            //transform.position += moveDirection * speed * Time.deltaTime; 
+        }
+
+    }
+
+    void Inputs(){
         Vector3 forward = playerCamera.transform.forward;
         Vector3 right = playerCamera.transform.right;
 
@@ -54,15 +92,12 @@ public class Player : MonoBehaviour
         }
         InputVector.Normalize();
 
-        Vector3 moveDirection = forward * InputVector.z + right * InputVector.x;
+        moveDirection = forward * InputVector.z + right * InputVector.x;
 
-
-        //Debug line
-        if(isDebugSet) {
-            Debug.DrawRay(transform.position + new Vector3(0,0.5f,0), moveDirection * speed, Color.green); 
+        if(Input.GetKeyDown(KeyCode.LeftShift) && moveDirection != Vector3.zero){
+            dashToggle = true;
+            dashFrameCount = 8;
+            //rb.AddForce(moveDirection,ForceMode.Impulse);
         }
-
-        //Set position
-        transform.position += moveDirection * speed * Time.deltaTime; 
     }
 }
