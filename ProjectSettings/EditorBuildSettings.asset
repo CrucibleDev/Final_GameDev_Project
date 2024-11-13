@@ -4,5 +4,8 @@
 EditorBuildSettings:
   m_ObjectHideFlags: 0
   serializedVersion: 2
-  m_Scenes: []
+  m_Scenes:
+  - enabled: 1
+    path: Assets/Scenes/Cloverfeild.unity
+    guid: cc23feb243fd43f4cbedfe0e27bbf732
   m_configObjects: {}
