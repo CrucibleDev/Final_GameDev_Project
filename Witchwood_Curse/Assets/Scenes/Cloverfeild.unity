@@ -605,22 +605,25 @@ MonoBehaviour:
   m_GameObject: {fileID: 900095374}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 8c2e585d3b0b4ee4c95f1e3c2e537924, type: 3}
+  m_Script: {fileID: 11500000, guid: 3fd24d1145b2bb94899b4ec18ac3c220, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
   settings:
     chunkSize: 100
     resolution: 100
-    noiseScale: 2
-    octaves: 4
-    amplitude: 20
-    persistence: 0.5
+    noiseScale: 0.35
+    octaves: 8
+    amplitude: 80
+    persistence: 0.4
     lacunarity: 2
-    numberOfFlattenedPoints: 10
-    flattenRadius: 20
+    numberOfFlattenedPoints: 50
+    flattenRadius: 40
+    minPointDistance: 50
     pathWidth: 12
   chunkPrefab: {fileID: 2560474891929685842, guid: b9be405fdbf0adc4eaa77537da6c0e55, type: 3}
   viewDistance: 3
+  seed: 0
+  generateStaticTerrain: 1
 --- !u!1 &1175251214
 GameObject:
   m_ObjectHideFlags: 0
