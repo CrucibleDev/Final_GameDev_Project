@@ -1,34 +1,69 @@
 using UnityEngine;
 using System.Collections.Generic;
+using System.Linq;
 
 public class TerrainChunkManager : MonoBehaviour
 {
+    [Header("Terrain Settings")]
     public TerrainChunkSettings settings;
     public GameObject chunkPrefab;
     public int viewDistance = 3;
     public int seed = 0;
     public bool generateStaticTerrain = false;
+
+    [Header("Tree Settings")]
     public GameObject treePrefab;
     [Range(0f, 1f)]
     public float treeDensity = 0.1f;
     public float minTreeDistance = 2f;
     public float maxTreeTilt = 15f;
-    [Header("Tree Settings")]
-    public Mesh treeMesh;  // Assign your tree mesh in inspector
-    public Material treeMaterial;  // Assign your tree material in inspector
-    public bool useTreeColliders = false;  // Whether to generate physics colliders for trees
-    
-    private Dictionary<Vector2Int, TerrainChunk> chunks = new Dictionary<Vector2Int, TerrainChunk>();
-    private Vector2Int currentChunkCoord;
-    private Transform player;
-    private List<Vector2> globalFlattenedPoints = new List<Vector2>();
-    private bool initialChunksGenerated = false;
-    private Dictionary<GameObject, List<Matrix4x4>> instancedTrees = new Dictionary<GameObject, List<Matrix4x4>>();
+    public Mesh treeMesh;
+    public Material treeMaterial;
+    public bool useTreeColliders = false;
 
-    void Start()
+    [SerializeField] private Transform playerTransform;
+    [SerializeField] private int maxResolution = 32; // Set this to your desired max resolution
+
+    // Cached components and values
+    private readonly Dictionary<Vector2Int, TerrainChunk> chunks = new Dictionary<Vector2Int, TerrainChunk>(50);
+    private readonly Stack<TerrainChunk> chunkPool = new Stack<TerrainChunk>(50);
+    private List<Vector2> globalFlattenedPoints = new List<Vector2>(20);
+    private readonly Dictionary<GameObject, List<Matrix4x4>> instancedTrees = new Dictionary<GameObject, List<Matrix4x4>>(50);
+    private readonly HashSet<Vector2Int> newChunkCoords = new HashSet<Vector2Int>(50);
+    
+    private Vector2Int currentChunkCoord;
+    private bool initialChunksGenerated;
+    
+    // Cached calculations
+    private float worldSize;
+    private float edgeBuffer;
+    private Vector2Int[] chunkOffsets;
+
+    private void Awake()
+    {
+        InitializeCachedValues();
+    }
+
+    private void InitializeCachedValues()
+    {
+        worldSize = settings.chunkSize * (viewDistance * 2 + 1);
+        edgeBuffer = settings.chunkSize * 0.5f;
+        
+        // Pre-calculate chunk offsets
+        chunkOffsets = new Vector2Int[(viewDistance * 2 + 1) * (viewDistance * 2 + 1)];
+        int index = 0;
+        for (int x = -viewDistance; x <= viewDistance; x++)
+        {
+            for (int z = -viewDistance; z <= viewDistance; z++)
+            {
+                chunkOffsets[index++] = new Vector2Int(x, z);
+            }
+        }
+    }
+
+    private void Start()
     {
         Random.InitState(seed);
-        player = Camera.main.transform;
         GenerateGlobalFlattenedPoints();
         
         if (generateStaticTerrain)
@@ -40,6 +75,76 @@ public class TerrainChunkManager : MonoBehaviour
         {
             UpdateChunks();
         }
+    }
+
+    private void Update()
+    {
+        if (generateStaticTerrain && initialChunksGenerated) return;
+
+        Vector2Int newChunkCoord = GetChunkCoordFromPosition(GetPlayerPosition());
+        if (newChunkCoord != currentChunkCoord)
+        {
+            currentChunkCoord = newChunkCoord;
+            UpdateChunks();
+            
+            if (generateStaticTerrain)
+            {
+                initialChunksGenerated = true;
+            }
+        }
+    }
+
+    private void UpdateChunks()
+    {
+        newChunkCoords.Clear();
+
+        // Use pre-calculated offsets
+        foreach (Vector2Int offset in chunkOffsets)
+        {
+            Vector2Int coord = currentChunkCoord + offset;
+            newChunkCoords.Add(coord);
+
+            if (!chunks.ContainsKey(coord))
+            {
+                CreateChunk(coord);
+            }
+        }
+
+        // Remove out-of-range chunks
+        foreach (var chunk in chunks.Where(c => !newChunkCoords.Contains(c.Key)).ToList())
+        {
+            ReturnChunkToPool(chunk.Key);
+        }
+    }
+
+    private void CreateChunk(Vector2Int coord)
+    {
+        TerrainChunk chunk;
+        Vector3 position = new Vector3(coord.x * settings.chunkSize, 0, coord.y * settings.chunkSize);
+
+        if (chunkPool.Count > 0)
+        {
+            chunk = chunkPool.Pop();
+            chunk.transform.position = position;
+            chunk.gameObject.SetActive(true);
+        }
+        else
+        {
+            GameObject chunkObject = Instantiate(chunkPrefab, position, Quaternion.identity, transform);
+            chunk = chunkObject.GetComponent<TerrainChunk>();
+        }
+
+        chunk.Initialize(new Vector2(position.x, position.z), settings, this);
+        chunks.Add(coord, chunk);
+    }
+
+    private void ReturnChunkToPool(Vector2Int coord)
+    {
+        TerrainChunk chunk = chunks[coord];
+        chunk.gameObject.SetActive(false);
+        instancedTrees.Remove(chunk.gameObject);
+        chunkPool.Push(chunk);
+        chunks.Remove(coord);
     }
 
     void GenerateGlobalFlattenedPoints()
@@ -352,83 +457,6 @@ public class TerrainChunkManager : MonoBehaviour
         return Vector2.Distance(point, projection);
     }
 
-    void Update()
-    {
-        if (!generateStaticTerrain || !initialChunksGenerated)
-        {
-            Vector2Int newChunkCoord = GetChunkCoordFromPosition(player.position);
-            if (newChunkCoord != currentChunkCoord)
-            {
-                currentChunkCoord = newChunkCoord;
-                UpdateChunks();
-                
-                if (generateStaticTerrain)
-                {
-                    initialChunksGenerated = true;
-                }
-            }
-        }
-    }
-
-    void UpdateChunks()
-    {
-        HashSet<Vector2Int> newChunkCoords = new HashSet<Vector2Int>();
-
-        for (int x = -viewDistance; x <= viewDistance; x++)
-        {
-            for (int z = -viewDistance; z <= viewDistance; z++)
-            {
-                Vector2Int coord = currentChunkCoord + new Vector2Int(x, z);
-                newChunkCoords.Add(coord);
-
-                if (!chunks.ContainsKey(coord))
-                {
-                    CreateChunk(coord);
-                }
-            }
-        }
-
-        List<Vector2Int> chunksToRemove = new List<Vector2Int>();
-        foreach (var chunk in chunks)
-        {
-            if (!newChunkCoords.Contains(chunk.Key))
-            {
-                chunksToRemove.Add(chunk.Key);
-            }
-        }
-
-        foreach (var coord in chunksToRemove)
-        {
-            DestroyChunk(coord);
-        }
-    }
-
-    void CreateChunk(Vector2Int coord)
-    {
-        // Use x for x and y for z consistently
-        Vector3 position = new Vector3(
-            coord.x * settings.chunkSize,
-            0,
-            coord.y * settings.chunkSize
-        );
-
-        GameObject chunkObject = Instantiate(chunkPrefab, position, Quaternion.identity, transform);
-        chunkObject.name = $"Chunk {coord.x}, {coord.y}";
-
-        TerrainChunk chunk = chunkObject.GetComponent<TerrainChunk>();
-        // Pass the world position as Vector2(x, z)
-        chunk.Initialize(new Vector2(position.x, position.z), settings, this);
-        chunks.Add(coord, chunk);
-    }
-
-    void DestroyChunk(Vector2Int coord)
-    {
-        GameObject chunkObj = chunks[coord].gameObject;
-        instancedTrees.Remove(chunkObj);
-        Destroy(chunkObj);
-        chunks.Remove(coord);
-    }
-
     Vector2Int GetChunkCoordFromPosition(Vector3 position)
     {
         int x = Mathf.FloorToInt(position.x / settings.chunkSize);
@@ -482,5 +510,28 @@ public class TerrainChunkManager : MonoBehaviour
                     matrices.GetRange(i, count).ToArray());
             }
         }
+    }
+
+    public Vector3 GetPlayerPosition()
+    {
+        if (playerTransform == null)
+        {
+            GameObject player = GameObject.FindGameObjectWithTag("Player");
+            if (player != null)
+            {
+                playerTransform = player.transform;
+            }
+            else
+            {
+                Debug.LogError("Player not found! Make sure player has 'Player' tag or assign reference in inspector.");
+                return Vector3.zero;
+            }
+        }
+        return playerTransform.position;
+    }
+
+    public int GetMaxResolution()
+    {
+        return maxResolution;
     }
 } 
