@@ -59,7 +59,6 @@ public class Player : MonoBehaviour
             if(rb.velocity.magnitude > maxVelocity){
                 rb.velocity = moveDirection * maxVelocity;
             }
-            Debug.Log(rb.velocity.magnitude);
             //transform.position += moveDirection * speed * Time.deltaTime; 
         }
 
