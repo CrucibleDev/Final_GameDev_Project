@@ -25,6 +25,7 @@ public class WorldGen : MonoBehaviour
 
             GameObject inst = Instantiate(prefab,new Vector3(x * 40, 0, z * 40),Quaternion.identity);
         }
+        
     }
 
     // Update is called once per frame

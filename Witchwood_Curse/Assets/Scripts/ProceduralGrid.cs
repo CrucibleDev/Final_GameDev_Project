@@ -1,18 +1,26 @@
 using UnityEngine;
+using System.Collections.Generic;
 
 [RequireComponent(typeof(MeshFilter), typeof(MeshRenderer))]
 public class ProceduralGrid : MonoBehaviour
 {
-    public int width = 10;          // Number of vertices along the width
-    public int height = 10;         // Number of vertices along the height
-    public float cellSize = 1f;     // Distance between vertices
+    public float width = 10f;
+    public float height = 10f;
+    public int resolution = 1;
 
     [Header("Noise Settings")]
-    public float noiseScale = 1f;       // Controls the frequency of the noise
-    public int octaves = 4;             // Number of layers of noise to combine
-    public float amplitude = 5f;        // Height of terrain features
-    public float persistence = 0.5f;    // Controls amplitude decay for each octave
-    public float lacunarity = 2f;       // Controls frequency increase for each octave
+    public float noiseScale = 1f;
+    public int octaves = 4;
+    public float amplitude = 5f;
+    public float persistence = 0.5f;
+    public float lacunarity = 2f;
+
+    [Header("Flattened Zones Settings")]
+    public int numberOfFlattenedPoints = 8;   // Number of random flattened zones
+    public float flattenRadius = 2f;          // Radius for flattening areas
+
+    [Header("Path Settings")]
+    public float pathWidth = 1f;              // Width of the path
 
     public bool debug = false;
 
@@ -21,11 +29,25 @@ public class ProceduralGrid : MonoBehaviour
     private int[] triangles;
 
     private MeshCollider meshCollider;
+    private List<Vector2> flattenedPoints = new List<Vector2>();  // List to store random flattened points
 
     void Start()
     {
+        GenerateFlattenedPoints();
         GenerateGrid();
         AddMeshCollider();
+    }
+
+    void GenerateFlattenedPoints()
+    {
+        // Generate random flattened points
+        flattenedPoints.Clear();
+        for (int i = 0; i < numberOfFlattenedPoints; i++)
+        {
+            float x = Random.Range(0, width);
+            float z = Random.Range(0, height);
+            flattenedPoints.Add(new Vector2(x, z));
+        }
     }
 
     void GenerateGrid()
@@ -33,46 +55,62 @@ public class ProceduralGrid : MonoBehaviour
         mesh = new Mesh();
         GetComponent<MeshFilter>().mesh = mesh;
 
-        // Generate vertices
-        vertices = new Vector3[(width + 1) * (height + 1)];
-        Vector3 center = new Vector3(height/2, 0, width/2);
+        // Calculate vertices - no need to multiply width/height by resolution
+        int verticesPerWidth = resolution + 1;
+        int verticesPerHeight = resolution + 1;
+        
+        vertices = new Vector3[verticesPerWidth * verticesPerHeight];
+        Vector3 center = new Vector3(width / 2, 0, height / 2);
         float maxDistance = Vector3.Distance(center, new Vector3(width, 0, height));
-        for (int i = 0, z = 0; z <= height; z++)
+
+        // Calculate step size
+        float stepX = width / resolution;  // Changed from (verticesPerWidth - 1)
+        float stepZ = height / resolution; // Changed from (verticesPerHeight - 1)
+
+        for (int i = 0, z = 0; z < verticesPerHeight; z++)
         {
-            for (int x = 0; x <= width; x++, i++)
+            for (int x = 0; x < verticesPerWidth; x++, i++)
             {
-                float distFromCenter = Vector3.Distance(center, new Vector3(x,0,z))/maxDistance;
+                float xPos = x * stepX;
+                float zPos = z * stepZ;
+                
+                float distFromCenter = Vector3.Distance(center, new Vector3(xPos, 0, zPos)) / maxDistance;
                 float falloff = Mathf.Pow(1 - distFromCenter, 2);
                 falloff = Mathf.Clamp01(falloff);
 
-                float y = GenerateNoise(x, z);  // Use the noise function for terrain height
-                y *= falloff;
-                vertices[i] = new Vector3(x * cellSize, y, z * cellSize);
-                if(debug){
-                    CreateDebugSphere(new Vector3(x,10,z),falloff);
+                float y = GenerateNoise(xPos, zPos) * falloff;
+
+                y = ApplyFlattenedZones(xPos, zPos, y);
+                y = ApplyPath(xPos, zPos, y);
+
+                vertices[i] = new Vector3(xPos, y, zPos);
+
+                if (debug)
+                {
+                    CreateDebugSphere(new Vector3(xPos, 10, zPos), falloff);
                 }
             }
         }
 
-        // Generate triangles
-        triangles = new int[width * height * 6];
-        for (int ti = 0, vi = 0, z = 0; z < height; z++, vi++)
+        // Update triangle generation for new resolution
+        triangles = new int[(verticesPerWidth - 1) * (verticesPerHeight - 1) * 6];
+        for (int ti = 0, vi = 0, z = 0; z < verticesPerHeight - 1; z++, vi++)
         {
-            for (int x = 0; x < width; x++, ti += 6, vi++)
+            for (int x = 0; x < verticesPerWidth - 1; x++, ti += 6, vi++)
             {
                 triangles[ti] = vi;
-                triangles[ti + 1] = vi + width + 1;
+                triangles[ti + 1] = vi + verticesPerWidth;
                 triangles[ti + 2] = vi + 1;
                 triangles[ti + 3] = vi + 1;
-                triangles[ti + 4] = vi + width + 1;
-                triangles[ti + 5] = vi + width + 2;
+                triangles[ti + 4] = vi + verticesPerWidth;
+                triangles[ti + 5] = vi + verticesPerWidth + 1;
             }
         }
 
         UpdateMesh();
     }
 
-    float GenerateNoise(int x, int z)
+    float GenerateNoise(float x, float z)
     {
         float total = 0;
         float frequency = 1;
@@ -81,10 +119,11 @@ public class ProceduralGrid : MonoBehaviour
 
         for (int i = 0; i < octaves; i++)
         {
-            float xCoord = x * noiseScale * frequency / width;
-            float zCoord = z * noiseScale * frequency / height;
+            // Adjust noise coordinates to account for physical size
+            float xCoord = (x / width) * noiseScale * frequency;
+            float zCoord = (z / height) * noiseScale * frequency;
 
-            float noiseValue = Mathf.PerlinNoise(xCoord, zCoord) * 2 - 1;  // Range [-1, 1]
+            float noiseValue = Mathf.PerlinNoise(xCoord, zCoord) * 2 - 1;
             total += noiseValue * amplitudeFactor;
 
             maxPossibleHeight += amplitudeFactor;
@@ -92,8 +131,49 @@ public class ProceduralGrid : MonoBehaviour
             frequency *= lacunarity;
         }
 
-        // Normalize and scale by the main amplitude
         return total / maxPossibleHeight * amplitude;
+    }
+
+    float ApplyFlattenedZones(float x, float z, float currentY)
+    {
+        foreach (Vector2 flatPoint in flattenedPoints)
+        {
+            Vector2 pos = new Vector2(x, z);
+            float dist = Vector2.Distance(pos, flatPoint);
+
+            if (dist < flattenRadius)
+            {
+                float flattenEffect = Mathf.Clamp01(1 - (dist / flattenRadius));
+                currentY = Mathf.Lerp(currentY, 0, flattenEffect);
+            }
+        }
+        return currentY;
+    }
+
+    float ApplyPath(float x, float z, float currentY)
+    {
+        for (int i = 0; i < flattenedPoints.Count - 1; i++)
+        {
+            Vector2 start = flattenedPoints[i];
+            Vector2 end = flattenedPoints[i + 1];
+
+            Vector2 pos = new Vector2(x, z);
+            float distToSegment = DistanceToLineSegment(pos, start, end);
+
+            if (distToSegment < pathWidth)
+            {
+                float pathEffect = Mathf.Clamp01(1 - (distToSegment / pathWidth));
+                currentY = Mathf.Lerp(currentY, 0, pathEffect);
+            }
+        }
+        return currentY;
+    }
+
+    float DistanceToLineSegment(Vector2 point, Vector2 start, Vector2 end)
+    {
+        Vector2 segment = end - start;
+        Vector2 projected = Vector2.ClampMagnitude(Vector2.Dot(point - start, segment.normalized) * segment.normalized, segment.magnitude);
+        return (point - (start + projected)).magnitude;
     }
 
     void UpdateMesh()
@@ -101,36 +181,24 @@ public class ProceduralGrid : MonoBehaviour
         mesh.Clear();
         mesh.vertices = vertices;
         mesh.triangles = triangles;
-        mesh.RecalculateNormals();  // Important for lighting to work
+        mesh.RecalculateNormals();
     }
 
-        // Adds a MeshCollider to the generated grid
     void AddMeshCollider()
     {
-        if (meshCollider == null) 
+        if (meshCollider == null)
         {
-            meshCollider = gameObject.AddComponent<MeshCollider>();  // Add MeshCollider if not already present
+            meshCollider = gameObject.AddComponent<MeshCollider>();
         }
-        
-        // Assign the MeshCollider to use the generated mesh
         meshCollider.sharedMesh = mesh;
-
-        // Optionally, set it to be convex for physics-based interaction (if needed)
-        meshCollider.convex = false;
     }
 
     void CreateDebugSphere(Vector3 position, float value)
     {
-        // Create a small sphere at each vertex position
         GameObject debugSphere = GameObject.CreatePrimitive(PrimitiveType.Sphere);
         debugSphere.transform.position = position;
         debugSphere.transform.localScale = Vector3.one * 0.5f;
-
-        // Set the color based on the falloff value (0 = black, 1 = white)
-        //Color color = value > 0.5f ? Color.white : Color.black;
-        debugSphere.GetComponent<Renderer>().material.color = new Color(value,value,value);
-
-        // Optional: Make the debug sphere a child of the grid for easier management
+        debugSphere.GetComponent<Renderer>().material.color = new Color(value, value, value);
         debugSphere.transform.parent = transform;
     }
 }

@@ -57,7 +57,8 @@ public class Player : MonoBehaviour
             //rb.velocity = moveDirection * maxVelocity;
 
             if(rb.velocity.magnitude > maxVelocity){
-                rb.velocity = moveDirection * maxVelocity;
+                Vector3 cappedVelocity = moveDirection * maxVelocity;
+                rb.velocity = new Vector3(cappedVelocity.x, rb.velocity.y, cappedVelocity.z);
             }
             //transform.position += moveDirection * speed * Time.deltaTime; 
         }
