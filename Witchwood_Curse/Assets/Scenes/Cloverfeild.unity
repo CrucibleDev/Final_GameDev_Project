@@ -467,11 +467,6 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 449199099}
   m_Mesh: {fileID: 0}
---- !u!1 &772487819 stripped
-GameObject:
-  m_CorrespondingSourceObject: {fileID: 7083635385073855270, guid: 9846815671179ba41bbeb7b905995bb5, type: 3}
-  m_PrefabInstance: {fileID: 4279518199242939350}
-  m_PrefabAsset: {fileID: 0}
 --- !u!1 &819974608
 GameObject:
   m_ObjectHideFlags: 0
@@ -629,13 +624,16 @@ MonoBehaviour:
   viewDistance: 3
   seed: 0
   generateStaticTerrain: 1
-  treePrefab: {fileID: 772487819}
-  treeDensity: 1
+  treePrefab: {fileID: 0}
+  treeDensity: 0.224
   minTreeDistance: 2
   maxTreeTilt: 15
   treeMesh: {fileID: 10210, guid: 0000000000000000e000000000000000, type: 0}
   treeMaterial: {fileID: 2100000, guid: 00b5cbdaac1dc6010a01a9c6d8f3f3b4, type: 2}
   useTreeColliders: 0
+  playerTransform: {fileID: 1239859443}
+  maxResolution: 64
+  showDebugVisuals: 0
 --- !u!1 &1175251214
 GameObject:
   m_ObjectHideFlags: 0

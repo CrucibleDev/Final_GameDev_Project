@@ -24,6 +24,9 @@ public class TerrainChunkManager : MonoBehaviour
     [SerializeField] private Transform playerTransform;
     [SerializeField] private int maxResolution = 32; // Set this to your desired max resolution
 
+    [Header("Debug Settings")]
+    public bool showDebugVisuals = false;
+
     // Cached components and values
     private readonly Dictionary<Vector2Int, TerrainChunk> chunks = new Dictionary<Vector2Int, TerrainChunk>(50);
     private readonly Stack<TerrainChunk> chunkPool = new Stack<TerrainChunk>(50);
@@ -65,6 +68,8 @@ public class TerrainChunkManager : MonoBehaviour
     {
         Random.InitState(seed);
         GenerateGlobalFlattenedPoints();
+        CreateBoundaryTriggers();
+        CreateDebugVisuals();
         
         if (generateStaticTerrain)
         {
@@ -247,34 +252,33 @@ public class TerrainChunkManager : MonoBehaviour
             globalFlattenedPoints = orderedPoints;
         }
 
+        CreateBoundaryTriggers();
         CreateDebugVisuals();
     }
 
-    void CreateDebugVisuals()
+    private void CreateBoundaryTriggers()
     {
-        Transform existingDebug = transform.Find("DebugPoints");
-        if (existingDebug != null)
-            Destroy(existingDebug.gameObject);
+        Transform existingBoundaries = transform.Find("BoundaryTriggers");
+        if (existingBoundaries != null)
+            Destroy(existingBoundaries.gameObject);
 
-        GameObject debugContainer = new GameObject("DebugPoints");
-        debugContainer.transform.parent = transform;
+        GameObject boundaryContainer = new GameObject("BoundaryTriggers");
+        boundaryContainer.transform.parent = transform;
 
         // Create invisible walls for flattened zones
         foreach (Vector2 point in globalFlattenedPoints)
         {
             GameObject cylinder = new GameObject($"ZoneBoundary_{point}");
-            cylinder.transform.parent = debugContainer.transform;
+            cylinder.transform.parent = boundaryContainer.transform;
             float y = GenerateNoise(point.x, point.y);
             cylinder.transform.position = new Vector3(point.x, y + 5f, point.y);
             
-            // Add cylinder collider
             CapsuleCollider collider = cylinder.AddComponent<CapsuleCollider>();
             collider.radius = settings.flattenRadius;
-            collider.height = 20f;  // Tall enough to contain player
+            collider.height = 20f;
             collider.isTrigger = true;
-            collider.direction = 1; // Orient vertically (Y-axis)
+            collider.direction = 1;
             
-            // Add boundary behavior
             cylinder.AddComponent<BoundaryTrigger>();
         }
 
@@ -285,9 +289,8 @@ public class TerrainChunkManager : MonoBehaviour
             Vector2 end = globalFlattenedPoints[i + 1];
             
             GameObject pathWall = new GameObject($"PathWall_{i}");
-            pathWall.transform.parent = debugContainer.transform;
+            pathWall.transform.parent = boundaryContainer.transform;
             
-            // Calculate path properties
             Vector2 pathDirection = (end - start).normalized;
             float pathLength = Vector2.Distance(start, end);
             float averageY = (GenerateNoise(start.x, start.y) + GenerateNoise(end.x, end.y)) / 2f;
@@ -297,19 +300,28 @@ public class TerrainChunkManager : MonoBehaviour
                 (start.y + end.y) / 2f
             );
             
-            // Create box collider
             BoxCollider boxCollider = pathWall.AddComponent<BoxCollider>();
             boxCollider.isTrigger = true;
             boxCollider.size = new Vector3(settings.pathWidth * 2, 20f, pathLength);
             pathWall.transform.position = pathCenter;
             
-            // Rotate to align with path
             float angle = Mathf.Atan2(end.y - start.y, end.x - start.x) * Mathf.Rad2Deg;
             pathWall.transform.rotation = Quaternion.Euler(0, -angle + 90, 0);
             
-            // Add boundary behavior
             pathWall.AddComponent<BoundaryTrigger>();
         }
+    }
+
+    private void CreateDebugVisuals()
+    {
+        Transform existingDebug = transform.Find("DebugVisuals");
+        if (existingDebug != null)
+            Destroy(existingDebug.gameObject);
+        
+        if (!showDebugVisuals) return;
+
+        GameObject debugContainer = new GameObject("DebugVisuals");
+        debugContainer.transform.parent = transform;
 
         // Create spheres for points
         foreach (Vector2 point in globalFlattenedPoints)

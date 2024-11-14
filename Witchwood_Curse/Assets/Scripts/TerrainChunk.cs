@@ -62,7 +62,10 @@ public class TerrainChunk : MonoBehaviour
         if (chunksAway <= 1) // Only current chunk and direct neighbors
         {
             targetResolution = manager.GetMaxResolution();
-            Debug.DrawLine(chunkCenter, playerPosition, Color.green, 0.1f);
+            if (manager.showDebugVisuals)
+            {
+                Debug.DrawLine(chunkCenter, playerPosition, Color.green, 0.1f);
+            }
         }
         else if (chunksAway <= 2) // Second ring
         {
