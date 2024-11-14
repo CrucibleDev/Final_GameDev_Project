@@ -22,6 +22,7 @@ public class TerrainChunk : MonoBehaviour
         
         GenerateGrid();
         AddMeshCollider();
+        GenerateTrees();
     }
 
     void GenerateGrid()
@@ -91,5 +92,97 @@ public class TerrainChunk : MonoBehaviour
         if (meshCollider == null)
             meshCollider = gameObject.AddComponent<MeshCollider>();
         meshCollider.sharedMesh = mesh;
+    }
+
+    private void GenerateTrees()
+    {
+        Transform existingTrees = transform.Find("Trees");
+        if (existingTrees != null)
+            Destroy(existingTrees.gameObject);
+
+        GameObject treeContainer = new GameObject("Trees");
+        treeContainer.transform.parent = transform;
+
+        // Create lists to store tree data
+        List<Matrix4x4> matrices = new List<Matrix4x4>();
+        List<Vector3> positions = new List<Vector3>(); // Store positions for collision checks
+
+        float stepSize = 1f / manager.treeDensity;
+        System.Random random = new System.Random(manager.seed + GetHashCode());
+
+        // First pass: collect all valid positions
+        for (float x = 0; x < width; x += stepSize)
+        {
+            for (float z = 0; z < height; z += stepSize)
+            {
+                float randomX = x + (float)(random.NextDouble() - 0.5f) * stepSize;
+                float randomZ = z + (float)(random.NextDouble() - 0.5f) * stepSize;
+
+                float worldX = position.x + randomX;
+                float worldZ = position.y + randomZ;
+
+                if (manager.IsPointInBoundary(new Vector2(worldX, worldZ)))
+                    continue;
+
+                Vector3 worldPos = new Vector3(worldX, 0, worldZ);
+
+                // Check distance from other trees
+                bool tooClose = false;
+                foreach (Vector3 existingPos in positions)
+                {
+                    if (Vector3.Distance(worldPos, existingPos) < manager.minTreeDistance)
+                    {
+                        tooClose = true;
+                        break;
+                    }
+                }
+                if (tooClose) continue;
+
+                // Get terrain height
+                float worldY = manager.GetTerrainHeight(worldX, worldZ);
+                worldPos.y = worldY;
+
+                // Calculate transform
+                float tiltX = (float)(random.NextDouble() - 0.5f) * manager.maxTreeTilt;
+                float tiltZ = (float)(random.NextDouble() - 0.5f) * manager.maxTreeTilt;
+                float rotationY = random.Next(360);
+                float scale = 0.8f + (float)random.NextDouble() * 0.4f;
+
+                Matrix4x4 matrix = Matrix4x4.TRS(
+                    worldPos,
+                    Quaternion.Euler(tiltX, rotationY, tiltZ),
+                    Vector3.one * scale
+                );
+
+                matrices.Add(matrix);
+                positions.Add(worldPos);
+            }
+        }
+
+        // Create batches of 1023 trees (GPU instancing limit)
+        const int batchSize = 1023;
+        int batchCount = Mathf.CeilToInt(matrices.Count / (float)batchSize);
+
+        // Store the renderers to prevent garbage collection
+        manager.AddInstancedRenderers(gameObject, matrices);
+
+        // Add colliders for physics interactions (optional)
+        if (manager.useTreeColliders)
+        {
+            foreach (Vector3 pos in positions)
+            {
+                GameObject colliderObj = new GameObject("TreeCollider");
+                colliderObj.transform.parent = treeContainer.transform;
+                colliderObj.transform.position = pos;
+                
+                CapsuleCollider collider = colliderObj.AddComponent<CapsuleCollider>();
+                collider.height = 2f; // Adjust based on your tree size
+                collider.radius = 0.5f;
+                collider.isTrigger = true;
+                
+                // Set the layer on the GameObject instead of the Collider
+                colliderObj.layer = LayerMask.NameToLayer("Trees");
+            }
+        }
     }
 }

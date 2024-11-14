@@ -6,7 +6,6 @@ public class BoundaryTrigger : MonoBehaviour
     private static Vector3 lastValidPosition;
     private static bool isInitialized = false;
     
-    // Cache the player's components
     private static Rigidbody playerRb;
     private static CharacterController playerController;
 
@@ -17,7 +16,6 @@ public class BoundaryTrigger : MonoBehaviour
             playerBoundaryCount++;
             Debug.Log($"Enter boundary. Count: {playerBoundaryCount}");
             
-            // Cache components if not already done
             if (!isInitialized)
             {
                 playerRb = other.GetComponent<Rigidbody>();
@@ -47,18 +45,32 @@ public class BoundaryTrigger : MonoBehaviour
             {
                 playerBoundaryCount = 0;
                 
-                // Get the direction from the boundary center to the player
                 Vector3 boundaryCenter = transform.position;
                 Vector3 directionToPlayer = (other.transform.position - boundaryCenter).normalized;
+                float boundaryRadius;
+
+                if (TryGetComponent<CapsuleCollider>(out var capsuleCollider))
+                {
+                    boundaryRadius = capsuleCollider.radius;
+                }
+                else if (TryGetComponent<BoxCollider>(out var boxCollider))
+                {
+                    boundaryRadius = boxCollider.size.x * 0.5f;
+                    directionToPlayer = transform.InverseTransformDirection(directionToPlayer);
+                    directionToPlayer.z = 0;
+                    directionToPlayer = transform.TransformDirection(directionToPlayer.normalized);
+                }
+                else
+                {
+                    Debug.LogError("No supported collider found on boundary!");
+                    return;
+                }
                 
-                // Project the last valid position onto the boundary surface
-                float boundaryRadius = GetComponent<CapsuleCollider>().radius;
                 Vector3 clampedPosition = boundaryCenter + directionToPlayer * boundaryRadius;
-                clampedPosition.y = other.transform.position.y; // Maintain player's height
+                clampedPosition.y = other.transform.position.y;
                 
                 Debug.Log($"Clamping position from {other.transform.position} to {clampedPosition}");
                 
-                // Force position reset based on component type
                 if (playerController != null)
                 {
                     playerController.enabled = false;
@@ -67,7 +79,6 @@ public class BoundaryTrigger : MonoBehaviour
                 }
                 else if (playerRb != null)
                 {
-                    // Add force to push player back into boundary
                     Vector3 pushDirection = (boundaryCenter - other.transform.position).normalized;
                     playerRb.velocity = Vector3.zero;
                     playerRb.angularVelocity = Vector3.zero;

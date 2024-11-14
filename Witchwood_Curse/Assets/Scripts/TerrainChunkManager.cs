@@ -8,12 +8,22 @@ public class TerrainChunkManager : MonoBehaviour
     public int viewDistance = 3;
     public int seed = 0;
     public bool generateStaticTerrain = false;
+    public GameObject treePrefab;
+    [Range(0f, 1f)]
+    public float treeDensity = 0.1f;
+    public float minTreeDistance = 2f;
+    public float maxTreeTilt = 15f;
+    [Header("Tree Settings")]
+    public Mesh treeMesh;  // Assign your tree mesh in inspector
+    public Material treeMaterial;  // Assign your tree material in inspector
+    public bool useTreeColliders = false;  // Whether to generate physics colliders for trees
     
     private Dictionary<Vector2Int, TerrainChunk> chunks = new Dictionary<Vector2Int, TerrainChunk>();
     private Vector2Int currentChunkCoord;
     private Transform player;
     private List<Vector2> globalFlattenedPoints = new List<Vector2>();
     private bool initialChunksGenerated = false;
+    private Dictionary<GameObject, List<Matrix4x4>> instancedTrees = new Dictionary<GameObject, List<Matrix4x4>>();
 
     void Start()
     {
@@ -185,12 +195,12 @@ public class TerrainChunkManager : MonoBehaviour
             // Create box collider
             BoxCollider boxCollider = pathWall.AddComponent<BoxCollider>();
             boxCollider.isTrigger = true;
-            boxCollider.size = new Vector3(pathLength, 20f, settings.pathWidth * 2);
+            boxCollider.size = new Vector3(settings.pathWidth * 2, 20f, pathLength);
             pathWall.transform.position = pathCenter;
             
             // Rotate to align with path
-            float angle = Mathf.Atan2(pathDirection.y, pathDirection.x) * Mathf.Rad2Deg;
-            pathWall.transform.rotation = Quaternion.Euler(0, -angle, 0);
+            float angle = Mathf.Atan2(end.y - start.y, end.x - start.x) * Mathf.Rad2Deg;
+            pathWall.transform.rotation = Quaternion.Euler(0, -angle + 90, 0);
             
             // Add boundary behavior
             pathWall.AddComponent<BoundaryTrigger>();
@@ -413,7 +423,9 @@ public class TerrainChunkManager : MonoBehaviour
 
     void DestroyChunk(Vector2Int coord)
     {
-        Destroy(chunks[coord].gameObject);
+        GameObject chunkObj = chunks[coord].gameObject;
+        instancedTrees.Remove(chunkObj);
+        Destroy(chunkObj);
         chunks.Remove(coord);
     }
 
@@ -422,5 +434,53 @@ public class TerrainChunkManager : MonoBehaviour
         int x = Mathf.FloorToInt(position.x / settings.chunkSize);
         int z = Mathf.FloorToInt(position.z / settings.chunkSize);
         return new Vector2Int(x, z);
+    }
+
+    public bool IsPointInBoundary(Vector2 point)
+    {
+        // Check flattened zones
+        foreach (Vector2 flatPoint in globalFlattenedPoints)
+        {
+            if (Vector2.Distance(point, flatPoint) < settings.flattenRadius)
+            {
+                return true;
+            }
+        }
+
+        // Check paths
+        for (int i = 0; i < globalFlattenedPoints.Count - 1; i++)
+        {
+            Vector2 start = globalFlattenedPoints[i];
+            Vector2 end = globalFlattenedPoints[i + 1];
+            float distToPath = DistanceToLineSegment(point, start, end);
+            if (distToPath < settings.pathWidth)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    public void AddInstancedRenderers(GameObject chunk, List<Matrix4x4> matrices)
+    {
+        instancedTrees[chunk] = matrices;
+    }
+
+    private void LateUpdate()
+    {
+        // Render all instanced trees
+        foreach (var kvp in instancedTrees)
+        {
+            List<Matrix4x4> matrices = kvp.Value;
+            const int batchSize = 1023;
+            
+            for (int i = 0; i < matrices.Count; i += batchSize)
+            {
+                int count = Mathf.Min(batchSize, matrices.Count - i);
+                Graphics.DrawMeshInstanced(treeMesh, 0, treeMaterial, 
+                    matrices.GetRange(i, count).ToArray());
+            }
+        }
     }
 } 
