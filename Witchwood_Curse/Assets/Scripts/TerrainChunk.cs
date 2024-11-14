@@ -5,7 +5,7 @@ using System.Collections.Generic;
 public class TerrainChunk : MonoBehaviour
 {
     private TerrainChunkManager manager;
-    private Vector2 position;
+    private Vector2 position;  // X, Z coordinates in world space
     private float width;
     private float height;
     private int resolution;
@@ -33,20 +33,37 @@ public class TerrainChunk : MonoBehaviour
         int verticesPerHeight = resolution + 1;
         
         Vector3[] vertices = new Vector3[verticesPerWidth * verticesPerHeight];
+        Vector3[] normals = new Vector3[vertices.Length];
         float stepX = width / resolution;
         float stepZ = height / resolution;
 
+        // Generate vertices and calculate normals
         for (int i = 0, z = 0; z < verticesPerHeight; z++)
         {
             for (int x = 0; x < verticesPerWidth; x++, i++)
             {
                 float xPos = x * stepX;
                 float zPos = z * stepZ;
+                // Use position.x and position.y consistently as world X and Z coordinates
                 float worldX = position.x + xPos;
                 float worldZ = position.y + zPos;
-
+                
                 float y = manager.GetTerrainHeight(worldX, worldZ);
                 vertices[i] = new Vector3(xPos, y, zPos);
+
+                // Calculate normal using central differences
+                float hL = manager.GetTerrainHeight(worldX - stepX, worldZ);
+                float hR = manager.GetTerrainHeight(worldX + stepX, worldZ);
+                float hD = manager.GetTerrainHeight(worldX, worldZ - stepZ);
+                float hU = manager.GetTerrainHeight(worldX, worldZ + stepZ);
+
+                Vector3 normal = new Vector3(
+                    (hL - hR) / (2 * stepX),
+                    2.0f,
+                    (hD - hU) / (2 * stepZ)
+                ).normalized;
+
+                normals[i] = normal;
             }
         }
 
@@ -65,8 +82,8 @@ public class TerrainChunk : MonoBehaviour
         }
 
         mesh.vertices = vertices;
+        mesh.normals = normals;
         mesh.triangles = triangles;
-        mesh.RecalculateNormals();
     }
 
     void AddMeshCollider()
@@ -75,4 +92,4 @@ public class TerrainChunk : MonoBehaviour
             meshCollider = gameObject.AddComponent<MeshCollider>();
         meshCollider.sharedMesh = mesh;
     }
-} 
+}

@@ -144,6 +144,58 @@ public class TerrainChunkManager : MonoBehaviour
         GameObject debugContainer = new GameObject("DebugPoints");
         debugContainer.transform.parent = transform;
 
+        // Create invisible walls for flattened zones
+        foreach (Vector2 point in globalFlattenedPoints)
+        {
+            GameObject cylinder = new GameObject($"ZoneBoundary_{point}");
+            cylinder.transform.parent = debugContainer.transform;
+            float y = GenerateNoise(point.x, point.y);
+            cylinder.transform.position = new Vector3(point.x, y + 5f, point.y);
+            
+            // Add cylinder collider
+            CapsuleCollider collider = cylinder.AddComponent<CapsuleCollider>();
+            collider.radius = settings.flattenRadius;
+            collider.height = 20f;  // Tall enough to contain player
+            collider.isTrigger = true;
+            collider.direction = 1; // Orient vertically (Y-axis)
+            
+            // Add boundary behavior
+            cylinder.AddComponent<BoundaryTrigger>();
+        }
+
+        // Create path boundaries
+        for (int i = 0; i < globalFlattenedPoints.Count - 1; i++)
+        {
+            Vector2 start = globalFlattenedPoints[i];
+            Vector2 end = globalFlattenedPoints[i + 1];
+            
+            GameObject pathWall = new GameObject($"PathWall_{i}");
+            pathWall.transform.parent = debugContainer.transform;
+            
+            // Calculate path properties
+            Vector2 pathDirection = (end - start).normalized;
+            float pathLength = Vector2.Distance(start, end);
+            float averageY = (GenerateNoise(start.x, start.y) + GenerateNoise(end.x, end.y)) / 2f;
+            Vector3 pathCenter = new Vector3(
+                (start.x + end.x) / 2f,
+                averageY + 5f,
+                (start.y + end.y) / 2f
+            );
+            
+            // Create box collider
+            BoxCollider boxCollider = pathWall.AddComponent<BoxCollider>();
+            boxCollider.isTrigger = true;
+            boxCollider.size = new Vector3(pathLength, 20f, settings.pathWidth * 2);
+            pathWall.transform.position = pathCenter;
+            
+            // Rotate to align with path
+            float angle = Mathf.Atan2(pathDirection.y, pathDirection.x) * Mathf.Rad2Deg;
+            pathWall.transform.rotation = Quaternion.Euler(0, -angle, 0);
+            
+            // Add boundary behavior
+            pathWall.AddComponent<BoundaryTrigger>();
+        }
+
         // Create spheres for points
         foreach (Vector2 point in globalFlattenedPoints)
         {
@@ -201,13 +253,15 @@ public class TerrainChunkManager : MonoBehaviour
         float noiseHeight = 0;
         float amplitudeSum = 0;
 
-        float worldX = x / settings.chunkSize;
-        float worldZ = z / settings.chunkSize;
+        // Make sure x and z are used correctly in the noise function
+        float worldX = x;
+        float worldZ = z;
 
         for (int i = 0; i < settings.octaves; i++)
         {
-            float sampleX = worldX * settings.noiseScale * frequency;
-            float sampleZ = worldZ * settings.noiseScale * frequency;
+            // Use x for x and z for z consistently
+            float sampleX = (worldX * frequency * settings.noiseScale) / 100f;
+            float sampleZ = (worldZ * frequency * settings.noiseScale) / 100f;
 
             float perlinValue = Mathf.PerlinNoise(sampleX + seed, sampleZ + seed) * 2 - 1;
             noiseHeight += perlinValue * amplitude;
@@ -341,6 +395,7 @@ public class TerrainChunkManager : MonoBehaviour
 
     void CreateChunk(Vector2Int coord)
     {
+        // Use x for x and y for z consistently
         Vector3 position = new Vector3(
             coord.x * settings.chunkSize,
             0,
@@ -351,6 +406,7 @@ public class TerrainChunkManager : MonoBehaviour
         chunkObject.name = $"Chunk {coord.x}, {coord.y}";
 
         TerrainChunk chunk = chunkObject.GetComponent<TerrainChunk>();
+        // Pass the world position as Vector2(x, z)
         chunk.Initialize(new Vector2(position.x, position.z), settings, this);
         chunks.Add(coord, chunk);
     }
