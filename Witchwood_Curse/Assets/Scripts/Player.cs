@@ -1,6 +1,7 @@
 using UnityEngine;
+using System.Collections;
 
-public class Player : MonoBehaviour
+public class Player : MonoBehaviour, IDamageable
 {
     [Header("References")]
     public Camera playerCamera;
@@ -9,10 +10,9 @@ public class Player : MonoBehaviour
 
     [Header("Stats")]
     [SerializeField] private int maxHealth = 10;
-    [SerializeField] private int currentHealth = 10;
-    [SerializeField] private float damage = 10f;
-    [SerializeField] private float range = 10f;
-    [SerializeField] private float spread = 1f;
+    [SerializeField] private int currentHealth;
+    [SerializeField] private float respawnDelay = 2f;
+    [SerializeField] private Vector3 respawnPoint = Vector3.zero;  // Where player respawns
 
     [Header("Movement Settings")]
     [SerializeField] private float moveSpeed = 35f;
@@ -49,6 +49,10 @@ public class Player : MonoBehaviour
 
     [Header("UI References")]
     [SerializeField] private HealthBar healthBar;
+
+    [Header("Combat")]
+    [SerializeField] private Wand wand;
+    [SerializeField] private GameObject playerModel;  // Reference to visual model
 
     void Start()
     {
@@ -203,25 +207,87 @@ public class Player : MonoBehaviour
         }
     }
 
-    public void TakeDamage(int damage)
+    public void TakeDamage(float damage)
     {
-        currentHealth -= damage;
-        healthBar.UpdateHealth(currentHealth);
-        
-        if (currentHealth <= 0)
-        {
-            isAlive = false;
-        }
-    }
+        if (!isAlive) return;
 
-    // Add this to update the health bar whenever health changes
-    public void SetHealth(int newHealth)
-    {
-        currentHealth = Mathf.Clamp(newHealth, 0, maxHealth);
+        currentHealth -= (int)damage;
+        
         if (healthBar != null)
         {
             healthBar.UpdateHealth(currentHealth);
         }
+
+        if (currentHealth <= 0)
+        {
+            Die();
+        }
+    }
+
+    private void Die()
+    {
+        isAlive = false;
+        
+        // Disable player controls
+        rb.velocity = Vector3.zero;
+        rb.isKinematic = true;
+        
+        // Disable shooting
+        if (wand != null)
+        {
+            wand.enabled = false;
+        }
+        
+        // Hide player model only (don't deactivate the whole player)
+        if (playerModel != null)
+        {
+            playerModel.SetActive(false);
+        }
+
+        // Tell Game Manager
+        Game.instance.OnPlayerDied();
+
+        // Start respawn countdown
+        StartCoroutine(RespawnRoutine());
+    }
+
+    private System.Collections.IEnumerator RespawnRoutine()
+    {
+        yield return new WaitForSeconds(respawnDelay);
+        Respawn();
+    }
+
+    private void Respawn()
+    {
+        // Reset health
+        currentHealth = maxHealth;
+        if (healthBar != null)
+        {
+            healthBar.UpdateHealth(currentHealth);
+        }
+
+        // Reset position
+        transform.position = respawnPoint;
+        rb.velocity = Vector3.zero;
+        
+        // Re-enable components
+        rb.isKinematic = false;
+        if (wand != null)
+        {
+            wand.enabled = true;
+        }
+        if (playerModel != null)
+        {
+            playerModel.SetActive(true);
+        }
+
+        isAlive = true;
+    }
+
+    // Optional: Set new respawn point (like a checkpoint system)
+    public void SetRespawnPoint(Vector3 newRespawnPoint)
+    {
+        respawnPoint = newRespawnPoint;
     }
 
 #if UNITY_EDITOR

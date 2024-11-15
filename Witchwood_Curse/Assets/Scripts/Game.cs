@@ -22,6 +22,12 @@ public class Game : MonoBehaviour
     //gameState
     Player player; 
 
+    [Header("Game State")]
+    [SerializeField] private int lives = 3;
+    [SerializeField] private GameObject gameOverPanel;
+    
+    private int currentLives;
+
     void Awake() {
         if(_instance != null && _instance != this){
             Destroy(gameObject);
@@ -37,7 +43,11 @@ public class Game : MonoBehaviour
     
     void Start()
     {
-
+        currentLives = lives;
+        if (gameOverPanel != null)
+        {
+            gameOverPanel.SetActive(false);
+        }
     }
     
     void Update()
@@ -102,5 +112,32 @@ public class Game : MonoBehaviour
         {
             ResumeGame();
         }
+    }
+
+    public void OnPlayerDied()
+    {
+        currentLives--;
+        
+        if (currentLives <= 0)
+        {
+            GameOver();
+        }
+    }
+
+    private void GameOver()
+    {
+        if (gameOverPanel != null)
+        {
+            gameOverPanel.SetActive(true);
+        }
+        
+        // Optionally pause the game
+        Time.timeScale = 0f;
+    }
+
+    public void RestartGame()
+    {
+        Time.timeScale = 1f;
+        ChangeScene(SceneManager.GetActiveScene().name);
     }
 }
