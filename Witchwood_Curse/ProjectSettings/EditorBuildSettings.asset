@@ -6,6 +6,9 @@ EditorBuildSettings:
   serializedVersion: 2
   m_Scenes:
   - enabled: 1
+    path: Assets/Scenes/MainMenu.unity
+    guid: 3b9bda2fdbf032846ac72c30b89e33d1
+  - enabled: 1
     path: Assets/Scenes/Cloverfeild.unity
     guid: cc23feb243fd43f4cbedfe0e27bbf732
   m_configObjects: {}

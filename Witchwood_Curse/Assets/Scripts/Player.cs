@@ -9,6 +9,7 @@ public class Player : MonoBehaviour
 
     [Header("Stats")]
     [SerializeField] private int maxHealth = 10;
+    [SerializeField] private int currentHealth = 10;
     [SerializeField] private float damage = 10f;
     [SerializeField] private float range = 10f;
     [SerializeField] private float spread = 1f;
@@ -26,23 +27,6 @@ public class Player : MonoBehaviour
     [SerializeField] private float dashDuration = 0.15f;
     [SerializeField] private float dashCooldown = 1f;
 
-    [Header("Camera Settings")]
-    [SerializeField] private float normalFOV = 60f;
-    [SerializeField] private float dashFOV = 70f;
-    [SerializeField] private float normalCameraDistance = 8f;
-    [SerializeField] private float dashCameraDistance = 7f;
-    [SerializeField] private float cameraLerpSpeed = 10f;
-    [SerializeField] private float normalCameraOffset = 1f;
-    [SerializeField] private float dashCameraOffset = 2f;
-    [SerializeField] private float dashCameraScale = 0.875f;
-    private Vector3 initialCameraLocalPos;
-    private float currentMaxOffset;
-    private Vector3 currentCameraOffset = Vector3.zero;
-    private float currentFOV;
-    private Vector3 currentCameraPos;
-    private Quaternion normalCameraRot;
-
-    private int currentHealth;
     private Vector3 inputVector = Vector3.zero;
     private Vector3 moveDirection = Vector3.zero;
     private bool isAlive = true;
@@ -56,32 +40,29 @@ public class Player : MonoBehaviour
     private bool isMoving = false;
     private Vector3 lastMoveDirection;
 
+    // Add these properties to expose necessary information to the camera
+    public bool IsAlive => isAlive;
+    public bool IsDashing => isDashing;
+    public Vector3 Velocity => rb.velocity;
+
+    [SerializeField] private PlayerCamera cameraController;
+
+    [Header("UI References")]
+    [SerializeField] private HealthBar healthBar;
+
     void Start()
     {
         playerCamera = Camera.main;
         rb = GetComponent<Rigidbody>();
         gm = Game.instance;
-        currentHealth = maxHealth;
         
-        rb.drag = groundDrag;
-        rb.angularDrag = groundDrag;
+        // Cap current health at max health
+        currentHealth = Mathf.Min(currentHealth, maxHealth);
         
-        // Store initial camera offset
-        if (playerCamera != null)
+        if (healthBar != null)
         {
-            initialCameraLocalPos = playerCamera.transform.localPosition;
-            currentCameraPos = initialCameraLocalPos;
-            playerCamera.fieldOfView = normalFOV;
-        }
-        currentMaxOffset = normalCameraOffset;
-        currentFOV = normalFOV;
-        normalCameraRot = Quaternion.Euler(45f, -45f, 0f);
-        
-        if (playerCamera != null)
-        {
-            playerCamera.fieldOfView = normalFOV;
-            playerCamera.transform.localPosition = initialCameraLocalPos;
-            playerCamera.transform.localRotation = normalCameraRot;
+            healthBar.SetMaxHealth(maxHealth);
+            healthBar.UpdateHealth(currentHealth);
         }
     }
     
@@ -204,33 +185,54 @@ public class Player : MonoBehaviour
         }
     }
 
-    void LateUpdate()
+    // Method to change camera mode
+    public void SetCameraLockMode(CameraLockMode mode)
     {
-        if (!isAlive || playerCamera == null) return;
-        
-        // Calculate scale factor for camera position
-        float scale = isDashing ? dashCameraScale : 1f;
-        
-        // Scale all dimensions to maintain the angle
-        Vector3 targetPos = initialCameraLocalPos * scale;
-        
-        // Smoothly transition FOV and position based on dash state
-        float targetFOV = isDashing ? dashFOV : normalFOV;
-        float targetOffset = isDashing ? dashCameraOffset : normalCameraOffset;
-        
-        currentFOV = Mathf.Lerp(currentFOV, targetFOV, Time.deltaTime * cameraLerpSpeed);
-        currentCameraPos = Vector3.Lerp(currentCameraPos, targetPos, Time.deltaTime * cameraLerpSpeed);
-        currentMaxOffset = Mathf.Lerp(currentMaxOffset, targetOffset, Time.deltaTime * cameraLerpSpeed);
-        
-        // Calculate camera offset based on player velocity
-        Vector3 targetOffsetVector = -rb.velocity * 0.1f;
-        targetOffsetVector = Vector3.ClampMagnitude(targetOffsetVector, currentMaxOffset);
-        
-        // Smoothly move camera to new offset
-        currentCameraOffset = Vector3.Lerp(currentCameraOffset, targetOffsetVector, Time.deltaTime * cameraLerpSpeed);
-        
-        // Apply position and offset
-        playerCamera.transform.localPosition = currentCameraPos + currentCameraOffset;
-        playerCamera.fieldOfView = currentFOV;
+        if (cameraController != null)
+        {
+            cameraController.SetLockMode(mode);
+        }
     }
+    
+    // Method to toggle camera mode
+    public void ToggleCameraLockMode()
+    {
+        if (cameraController != null)
+        {
+            cameraController.ToggleLockMode();
+        }
+    }
+
+    public void TakeDamage(int damage)
+    {
+        currentHealth -= damage;
+        healthBar.UpdateHealth(currentHealth);
+        
+        if (currentHealth <= 0)
+        {
+            isAlive = false;
+        }
+    }
+
+    // Add this to update the health bar whenever health changes
+    public void SetHealth(int newHealth)
+    {
+        currentHealth = Mathf.Clamp(newHealth, 0, maxHealth);
+        if (healthBar != null)
+        {
+            healthBar.UpdateHealth(currentHealth);
+        }
+    }
+
+#if UNITY_EDITOR
+    // This will update the health bar in the editor when you change currentHealth
+    private void OnValidate()
+    {
+        if (healthBar != null && Application.isPlaying)
+        {
+            currentHealth = Mathf.Clamp(currentHealth, 0, maxHealth);
+            healthBar.UpdateHealth(currentHealth);
+        }
+    }
+#endif
 }
