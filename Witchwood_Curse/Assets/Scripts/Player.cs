@@ -54,6 +54,9 @@ public class Player : MonoBehaviour, IDamageable
     [SerializeField] private Wand wand;
     [SerializeField] private GameObject playerModel;  // Reference to visual model
 
+    [Header("Aim Assist")]
+    [SerializeField] private AimLaser aimLaser;
+
     void Start()
     {
         playerCamera = Camera.main;
@@ -67,6 +70,12 @@ public class Player : MonoBehaviour, IDamageable
         {
             healthBar.SetMaxHealth(maxHealth);
             healthBar.UpdateHealth(currentHealth);
+        }
+
+        // Initialize aim laser if not already assigned
+        if (aimLaser == null)
+        {
+            aimLaser = gameObject.AddComponent<AimLaser>();
         }
     }
     

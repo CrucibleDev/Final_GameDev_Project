@@ -99,7 +99,7 @@ SphereCollider:
   m_IsTrigger: 0
   m_Enabled: 1
   serializedVersion: 2
-  m_Radius: 0.5
+  m_Radius: 0.88
   m_Center: {x: 0, y: 0, z: 0}
 --- !u!54 &2856821102401117513
 Rigidbody:
@@ -129,6 +129,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 1e5554c2ba1649c4396ad42614175de6, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  lifetime: 3
+  ignoreCollisionTime: 0.15
 --- !u!198 &8316983687804438696
 ParticleSystem:
   m_ObjectHideFlags: 0
