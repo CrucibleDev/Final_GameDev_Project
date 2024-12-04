@@ -13,7 +13,7 @@ MonoBehaviour:
   m_Name: Big Spell
   m_EditorClassIdentifier: 
   spellName: Big
-  icon: {fileID: 0}
+  icon: {fileID: 21300000, guid: 3c855318010f9c7478060b51261ef44c, type: 3}
   damageModifier: 2
   fireRateModifier: 0.5
   projectileSpeedModifier: 0.8

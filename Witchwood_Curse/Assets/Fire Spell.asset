@@ -13,7 +13,7 @@ MonoBehaviour:
   m_Name: Fire Spell
   m_EditorClassIdentifier: 
   spellName: Fire
-  icon: {fileID: 0}
+  icon: {fileID: 21300000, guid: 376f7d0e626fc5d4bb74eaaee792019d, type: 3}
   damageModifier: 1
   fireRateModifier: 1
   projectileSpeedModifier: 1

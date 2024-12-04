@@ -16,11 +16,10 @@ public class Game : MonoBehaviour
     [SerializeField] private bool canPause = true;
     [SerializeField] private bool persistBetweenScenes = true;
     
-    private bool isPaused = false;
-    public bool IsPaused => isPaused;
+    public bool isPaused = false;
     
     //gameState
-    Player player; 
+    [SerializeField] Player player;
 
     [Header("Game State")]
     [SerializeField] private int lives = 3;

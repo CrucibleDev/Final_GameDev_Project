@@ -3,7 +3,7 @@ using UnityEngine;
 public class Projectile : MonoBehaviour
 {
     [SerializeField] private float lifetime = 3f;
-    [SerializeField] private float ignoreCollisionTime = 0.2f; // Time to ignore collisions
+    //[SerializeField] private float ignoreCollisionTime = 0.2f; // Time to ignore collisions
     
     private float damage;
     private Vector3 velocity;
@@ -30,11 +30,14 @@ public class Projectile : MonoBehaviour
     
     private void OnCollisionEnter(Collision collision)
     {
-        // Ignore collisions for a brief period after spawning
-        if (Time.time - spawnTime < ignoreCollisionTime) return;
+        // // Ignore collisions for a brief period after spawning
+        // if (Time.time - spawnTime < ignoreCollisionTime) return;
         
         // Ignore collisions with the shooter
-        if (collision.gameObject == shooter) return;
+        if (collision.gameObject == shooter){   
+            Physics.IgnoreCollision(collision.collider, GetComponent<Collider>());
+            return;
+        }
         
         var damageable = collision.gameObject.GetComponent<IDamageable>();
         if (damageable != null)

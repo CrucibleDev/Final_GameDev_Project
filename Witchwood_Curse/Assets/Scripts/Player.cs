@@ -219,6 +219,7 @@ public class Player : MonoBehaviour, IDamageable
     public void TakeDamage(float damage)
     {
         if (!isAlive) return;
+        if (isDashing) return;
 
         currentHealth -= (int)damage;
         
@@ -260,7 +261,7 @@ public class Player : MonoBehaviour, IDamageable
         StartCoroutine(RespawnRoutine());
     }
 
-    private System.Collections.IEnumerator RespawnRoutine()
+    private IEnumerator RespawnRoutine()
     {
         yield return new WaitForSeconds(respawnDelay);
         Respawn();
